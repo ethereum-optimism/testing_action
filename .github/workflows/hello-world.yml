@@ -52,7 +52,6 @@ jobs:
           HTTP_STATUS=$(echo "$REPO_RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
           if [ "$HTTP_STATUS" = "200" ]; then
             echo "✅ Repository read access: GRANTED"
-            echo "$REPO_RESPONSE" | grep -v "HTTP_STATUS" | jq -r '.permissions // "No permissions object found"' 2>/dev/null || echo "Could not parse permissions"
           else
             echo "❌ Repository read access: DENIED (HTTP $HTTP_STATUS)"
           fi
@@ -74,26 +73,24 @@ jobs:
             echo "❌ User API access: DENIED (HTTP $HTTP_STATUS)"
           fi
           
-          # Try to check repository permissions endpoint
+          # Extract and display actual permissions from API response
           echo ""
-          echo "Testing repository permissions endpoint..."
-          PERM_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME" | grep -v "HTTP_STATUS")
-          
+          echo "--- Token Permissions (from API) ---"
           if command -v jq &> /dev/null; then
-            echo "Repository permissions from API:"
-            echo "$PERM_RESPONSE" | jq -r '.permissions // empty' 2>/dev/null || echo "No permissions object in response"
+            PERM_RESPONSE=$(curl -s \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME")
+            
+            PERMISSIONS=$(echo "$PERM_RESPONSE" | jq -r '.permissions // empty' 2>/dev/null)
+            if [ -n "$PERMISSIONS" ] && [ "$PERMISSIONS" != "null" ]; then
+              echo "$PERMISSIONS" | jq -r 'to_entries | .[] | "\(.key): \(.value)"' 2>/dev/null || echo "Could not parse permissions"
+            else
+              echo "No permissions object found in API response"
+            fi
           else
-            echo "jq not available, showing raw response snippet:"
-            echo "$PERM_RESPONSE" | head -20
+            echo "jq not available, cannot parse permissions"
           fi
-          
-          # Display workflow permissions
-          echo ""
-          echo "--- Workflow Permissions (from workflow file) ---"
-          echo "contents: read"
           
           # Try to get repository collaborators to test permissions
           echo ""
